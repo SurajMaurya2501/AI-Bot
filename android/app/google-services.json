@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1041539484545",
+    "project_id": "ai-bot-701fc",
+    "storage_bucket": "ai-bot-701fc.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1041539484545:android:9c4f0deed1a04a6db57680",
+        "android_client_info": {
+          "package_name": "com.example.ai_bot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCd0HtWK8qGloF6FW3faFihH05tOZtmbjw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
