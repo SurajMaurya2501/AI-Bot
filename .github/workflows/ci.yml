@@ -24,5 +24,10 @@ jobs:
               with:
                 channel: "stable"
             - run: flutter pub get
-            - run: flutter analyze
-
+            - run: flutter build apk --spil-per-abi
+            - name: Push to Releases
+              uses: ncipollo/release-action@v1
+              with:
+                artifacts: "build/app/outputs/flutter-apk/*"
+                tag: v1.0.${{github.run_number}}
+                token: ${{secrets.GITHUB_TOKEN}}
