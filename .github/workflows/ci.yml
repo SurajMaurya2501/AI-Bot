@@ -5,7 +5,7 @@ on:
         branches:
             - master
 
-    push_request:
+    push:
         branches:
             - master
 
