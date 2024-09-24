@@ -20,6 +20,8 @@ class _GeminiScreenState extends State<GeminiScreen> {
   ScrollController scrollController = ScrollController();
   late FocusNode _focusNode;
   bool _isFirstTime = true;
+  List<String> titleLists = [];
+  bool isTitleEmpty = false;
 
   @override
   void initState() {
@@ -67,13 +69,14 @@ class _GeminiScreenState extends State<GeminiScreen> {
           },
         ),
       ),
-      drawer: const Drawer(
+      drawer: Drawer(
         backgroundColor: const Color.fromARGB(
           255,
           21,
           21,
           21,
         ),
+        child: drawerBody(),
       ),
       backgroundColor: const Color.fromARGB(
         255,
@@ -340,8 +343,10 @@ class _GeminiScreenState extends State<GeminiScreen> {
                   _controller.clear();
                   gemini.showLoading = true;
                   provider.updateWidget();
+                  generateTitle();
                   gemini.geminiStream(gemini.chats, context, scrollController);
-                  gemini.scrollToEnd(scrollController,1500);
+                  gemini.scrollToEnd(scrollController, 1500);
+                  setState(() {});
                 }
               },
               controller: _controller,
@@ -392,7 +397,7 @@ class _GeminiScreenState extends State<GeminiScreen> {
                               provider.updateWidget();
                               gemini.geminiStream(
                                   gemini.chats, context, scrollController);
-                              gemini.scrollToEnd(scrollController,1500);
+                              gemini.scrollToEnd(scrollController, 1500);
                             }
                           },
                           icon: const Icon(
@@ -419,5 +424,69 @@ class _GeminiScreenState extends State<GeminiScreen> {
         ],
       ),
     );
+  }
+
+  Widget drawerBody() {
+    return Container(
+      margin: const EdgeInsets.only(
+        top: 50.0,
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(
+              Icons.add,
+              color: Colors.white,
+            ),
+            onTap: () {},
+            hoverColor: Colors.grey,
+            title: const Text(
+              "New Chat",
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+          ),
+          const Divider(
+            thickness: 0.3,
+          ),
+          ListView.builder(
+            padding: const EdgeInsets.all(0.0),
+            shrinkWrap: true,
+            itemCount: titleLists.length,
+            itemBuilder: (context, index) {
+              return ListTile(
+                onTap: () {},
+                hoverColor: Colors.grey,
+                title: Text(
+                  titleLists[index],
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  String generateTitle() {
+    String generatedTitle = '';
+
+    if (titleLists.isEmpty) {
+      gemini.gemini
+          .text(
+              "please give a single title which describles above chat without \"title\" in it")
+          .then(
+        (value) {
+          if (value != null) {
+            generatedTitle = value?.output ?? "";
+            titleLists.add(generatedTitle);
+            print("Generated Title : ${value?.output}}");
+          }
+        },
+      );
+      return generatedTitle ?? "No Title Generated";
+    }
+
+    return "";
   }
 }
