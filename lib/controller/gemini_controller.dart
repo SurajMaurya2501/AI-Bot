@@ -1,15 +1,27 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:firebase_gemini_ai/model/message_model.dart';
 import 'package:firebase_gemini_ai/provider/message_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gemini/flutter_gemini.dart';
+import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 class FirebaseGemini {
+  String generatedTitle = '';
+  Map<String, dynamic> messageToSave = {};
+  List<Map<String, dynamic>> allChat = [];
   final gemini = Gemini.instance;
   List<MessageModel> messages = [];
   List<Content> chats = [];
+  List<String> titleLists = [];
   List<MessageModel> messageModel = [];
   bool showLoading = false;
+  Uint8List? selectedImage;
 
   Future<void> geminiStream(List<Content> message, BuildContext context,
       ScrollController scrollController) async {
@@ -31,20 +43,31 @@ class FirebaseGemini {
                 ),
               ],
             );
+            messageToSave['user'] = chats[chats.length - 2].parts?.last.text;
+            messageToSave['model'] =
+                "${chats[chats.length - 1].parts?.lastOrNull?.text}${value.output}";
+            allChat.removeLast();
+            allChat.add(messageToSave);
           } else {
+            messageToSave['user'] = chats.last.parts?.last.text;
             chats.add(
               Content(
                 role: "model",
                 parts: [
                   Parts(
-                    text: value?.output,
+                    text: value.output,
                   ),
                 ],
               ),
             );
+            messageToSave['model'] = value.output;
+            allChat.add(messageToSave);
           }
+          messageToSave = {};
+          // print("MessageToSave - $messageToSave");
+          // print("allChat - $allChat");
           scrollToEnd(scrollController, 500);
-
+          storeChats(generatedTitle, allChat, context);
           final provider = Provider.of<MessageProvider>(context, listen: false);
           showLoading = false;
           provider.updateWidget();
@@ -61,6 +84,35 @@ class FirebaseGemini {
     }
   }
 
+  Future<void> geminiTextAndImage(String text, List<Uint8List> images,
+      ScrollController scrollController, BuildContext context) async {
+    try {
+      gemini.textAndImage(text: text, images: images).then(
+        (value) {
+          messageToSave['user'] = chats.last.parts?.last.text;
+          messageToSave['model'] = value?.output;
+          allChat.add(messageToSave);
+          chats.add(
+            Content(parts: [
+              Parts(
+                text: value?.output,
+              ),
+            ], role: "model"),
+          );
+          scrollToEnd(scrollController, 500);
+          storeChats(generatedTitle, allChat, context);
+          final provider = Provider.of<MessageProvider>(context, listen: false);
+          showLoading = false;
+          provider.updateWidget();
+          print("message : ${value?.output}");
+        },
+      );
+      messageToSave = {};
+    } catch (e) {
+      print("Error Occured: $e");
+    }
+  }
+
   scrollToEnd(ScrollController scrollController, int timer) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       scrollController.animateTo(
@@ -71,5 +123,114 @@ class FirebaseGemini {
         curve: Curves.easeInOut,
       );
     });
+  }
+
+  Future<void> storeChats(String title, List<Map<String, dynamic>> allData,
+      BuildContext context) async {
+    try {
+      String date = DateFormat("dd-MM-yyyy").format(DateTime.now());
+      if (generatedTitle.isNotEmpty) {
+        CollectionReference collectionReference =
+            FirebaseFirestore.instance.collection("chats");
+
+        DocumentSnapshot docSnap = await collectionReference.doc(title).get();
+        if (docSnap.exists) {
+          collectionReference
+              .doc(title)
+              .update({"chats": allData, "date": date});
+        } else {
+          collectionReference.doc(title).set({"chats": allData, "date": date});
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Error Occured : $e",
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  String generateTitle(int selectedIndex) {
+    if (chats.isEmpty) {
+      gemini.chat([
+        ...chats,
+        Content(parts: [
+          Parts(
+            text:
+                "please give a single title which describles above chat without \"title\" in it",
+          ),
+        ], role: "user"),
+      ]).then(
+        (value) {
+          if (value != null) {
+            generatedTitle = value.output ?? "";
+            titleLists.add(generatedTitle);
+            print("Generated Title : ${value.output}}");
+          }
+        },
+      );
+    }
+
+    return generatedTitle;
+  }
+
+  Future<void> getHistory() async {
+    QuerySnapshot querySnapshot =
+        await FirebaseFirestore.instance.collection("chats").get();
+    titleLists = querySnapshot.docs.map((e) => e.id).toList();
+  }
+
+  Future<void> getChats(String title, BuildContext context,
+      ScrollController scrollController) async {
+    chats.clear();
+    final provider = Provider.of<MessageProvider>(context, listen: false);
+    DocumentSnapshot documentSnapshot =
+        await FirebaseFirestore.instance.collection("chats").doc(title).get();
+    Map<String, dynamic> mapData =
+        documentSnapshot.data() as Map<String, dynamic>;
+    List<dynamic> messageList = mapData["chats"];
+
+    for (int i = 0; i < messageList.length; i++) {
+      chats.add(
+        Content(parts: [
+          Parts(
+            text: messageList[i]["user"],
+          ),
+        ], role: "user"),
+      );
+      chats.add(
+        Content(parts: [
+          Parts(
+            text: messageList[i]["model"],
+          ),
+        ], role: "model"),
+      );
+    }
+    scrollToEnd(scrollController, 1500);
+    provider.updateWidget();
+  }
+
+  Future<void> pickImage() async {
+    var status = await Permission.manageExternalStorage.request();
+    if (status.isGranted) {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+          allowMultiple: false,
+          type: FileType.custom,
+          allowedExtensions: [
+            'jpg',
+            'jpeg',
+            'png',
+          ]);
+
+      if (result != null) {
+        File file = File(result.files.single.path!);
+        selectedImage = file.readAsBytesSync();
+      }
+    }
   }
 }
