@@ -1,6 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_gemini_ai/provider/message_provider.dart';
 import 'package:firebase_gemini_ai/view/gemini.dart';
+import 'package:firebase_gemini_ai/view/signup.dart';
+import 'package:firebase_gemini_ai/view/splash.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_gemini/flutter_gemini.dart';
@@ -48,7 +50,12 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
-    return const GeminiScreen();
+    // return const GeminiScreen();
     // return const GeminiNewScreen();
+    // return const LoginScreen();
+    // return SignUpAndLoginScreen(
+    //   isLoginPage: false,
+    // );
+    return const SplashScreen();
   }
 }

@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:firebase_gemini_ai/model/message_model.dart';
+import 'package:firebase_gemini_ai/controller/shared_preferences.dart';
 import 'package:firebase_gemini_ai/provider/message_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gemini/flutter_gemini.dart';
@@ -16,12 +16,11 @@ class FirebaseGemini {
   Map<String, dynamic> messageToSave = {};
   List<Map<String, dynamic>> allChat = [];
   final gemini = Gemini.instance;
-  List<MessageModel> messages = [];
   List<Content> chats = [];
   List<String> titleLists = [];
-  List<MessageModel> messageModel = [];
   bool showLoading = false;
   Uint8List? selectedImage;
+  final sharedPref = SharedPref();
 
   Future<void> geminiStream(List<Content> message, BuildContext context,
       ScrollController scrollController) async {
@@ -133,13 +132,21 @@ class FirebaseGemini {
         CollectionReference collectionReference =
             FirebaseFirestore.instance.collection("chats");
 
+        String email = await sharedPref.getData("email");
+
         DocumentSnapshot docSnap = await collectionReference.doc(title).get();
         if (docSnap.exists) {
           collectionReference
+              .doc(email)
+              .collection("topics")
               .doc(title)
               .update({"chats": allData, "date": date});
         } else {
-          collectionReference.doc(title).set({"chats": allData, "date": date});
+          collectionReference
+              .doc(email)
+              .collection("topics")
+              .doc(title)
+              .set({"chats": allData, "date": date});
         }
       }
     } catch (e) {
@@ -161,8 +168,7 @@ class FirebaseGemini {
         ...chats,
         Content(parts: [
           Parts(
-            text:
-                "please give a single title which describles above chat without \"title\" in it",
+            text: "Give me only a suitable title for above chat",
           ),
         ], role: "user"),
       ]).then(
@@ -180,17 +186,28 @@ class FirebaseGemini {
   }
 
   Future<void> getHistory() async {
-    QuerySnapshot querySnapshot =
-        await FirebaseFirestore.instance.collection("chats").get();
-    titleLists = querySnapshot.docs.map((e) => e.id).toList();
+    String email = await sharedPref.getData("email");
+    QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+        .collection("chats")
+        .doc(email)
+        .collection("topics")
+        .get();
+    if (querySnapshot.docs.isNotEmpty) {
+      titleLists = querySnapshot.docs.map((e) => e.id).toList();
+    }
   }
 
   Future<void> getChats(String title, BuildContext context,
       ScrollController scrollController) async {
     chats.clear();
+    String email = await sharedPref.getData("email");
     final provider = Provider.of<MessageProvider>(context, listen: false);
-    DocumentSnapshot documentSnapshot =
-        await FirebaseFirestore.instance.collection("chats").doc(title).get();
+    DocumentSnapshot documentSnapshot = await FirebaseFirestore.instance
+        .collection("chats")
+        .doc(email)
+        .collection("topics")
+        .doc(title)
+        .get();
     Map<String, dynamic> mapData =
         documentSnapshot.data() as Map<String, dynamic>;
     List<dynamic> messageList = mapData["chats"];
